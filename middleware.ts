@@ -1,15 +1,25 @@
-import { getUser } from "@netlify/identity";
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_COOKIE, hashPin } from "@/lib/auth";
 
 export async function middleware(request: NextRequest) {
-  const user = await getUser();
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  const path = request.nextUrl.pathname;
+  const isPublicPath =
+    path.startsWith("/login") || path.startsWith("/api/auth/");
 
-  if (!user && !isLoginPage) {
+  const configuredPin = process.env.APP_PIN;
+  if (!configuredPin) {
+    if (isPublicPath) return NextResponse.next();
+    return NextResponse.redirect(new URL("/login?setup=1", request.url));
+  }
+
+  const expectedCookie = await hashPin(configuredPin);
+  const hasAccess = request.cookies.get(AUTH_COOKIE)?.value === expectedCookie;
+
+  if (!hasAccess && !isPublicPath) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (user && isLoginPage) {
+  if (hasAccess && path.startsWith("/login")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
