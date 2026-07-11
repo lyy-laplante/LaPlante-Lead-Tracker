@@ -1,16 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { logout } from "@netlify/identity";
 
 export default function Header() {
-  const router = useRouter();
-
   async function handleSignOut() {
-    await logout();
-    router.push("/login");
-    router.refresh();
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
   }
 
   return (
@@ -35,7 +30,7 @@ export default function Header() {
             onClick={handleSignOut}
             className="text-sm font-medium text-muted transition hover:text-ink"
           >
-            Sign out
+            Lock tracker
           </button>
         </nav>
       </div>
