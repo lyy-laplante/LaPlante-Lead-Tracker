@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@netlify/identity";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  useEffect(() => {
+    setNeedsSetup(new URLSearchParams(window.location.search).get("setup") === "1");
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -17,11 +20,21 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await login(email, password);
-      router.push("/");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to sign in.");
+      }
+
+      router.replace("/");
       router.refresh();
-    } catch {
-      setError("That email and password didn't match. Try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {
       setLoading(false);
     }
@@ -43,33 +56,30 @@ export default function LoginPage() {
           onSubmit={handleSubmit}
           className="rounded-lg border border-black/5 bg-surface p-6 shadow-sm"
         >
-          <div className="mb-4">
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-ink">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
+          <h2 className="mb-2 text-lg font-semibold text-ink">Enter access PIN</h2>
+          <p className="mb-5 text-sm text-muted">
+            Use the shared PIN provided by your team.
+          </p>
 
-          <div className="mb-6">
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-ink">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
+          <label htmlFor="pin" className="mb-1 block text-sm font-medium text-ink">
+            PIN
+          </label>
+          <input
+            id="pin"
+            type="password"
+            inputMode="numeric"
+            autoComplete="current-password"
+            required
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            className="mb-5 w-full rounded-md border border-black/10 px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+
+          {needsSetup && (
+            <p className="mb-4 text-sm text-overdue" role="alert">
+              Add an APP_PIN environment variable in Netlify, then redeploy the site.
+            </p>
+          )}
 
           {error && (
             <p className="mb-4 text-sm text-overdue" role="alert">
@@ -82,13 +92,9 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-dark disabled:opacity-60"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Checking..." : "Open tracker"}
           </button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-muted">
-          Accounts are invited directly through Netlify Identity — contact Lyy for access.
-        </p>
       </div>
     </div>
   );
